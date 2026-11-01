@@ -14,10 +14,10 @@ package enforcer
 import (
 	"time"
 
-	"github.com/kamalyes/go-casbin/policy"
-	"github.com/kamalyes/go-logger"
-	"github.com/kamalyes/go-toolbox/pkg/breaker"
-	"github.com/kamalyes/go-toolbox/pkg/retry"
+	"github.com/HitGameAI/apex-casbin/policy"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
+	"github.com/HitGameAI/apex-toolbox/pkg/breaker"
+	"github.com/HitGameAI/apex-toolbox/pkg/retry"
 )
 
 // Options 执行器配置项

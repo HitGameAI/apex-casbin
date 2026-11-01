@@ -24,7 +24,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/kamalyes/go-casbin/policy"
+	"github.com/HitGameAI/apex-casbin/policy"
 )
 
 // TenantHostBinding 租户域名绑定关系

@@ -14,8 +14,8 @@ package role
 import (
 	"strings"
 
-	"github.com/kamalyes/go-casbin/errors"
-	"github.com/kamalyes/go-logger"
+	"github.com/HitGameAI/apex-casbin/errors"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 )
 
 // RoleHierarchy 角色层级管理器

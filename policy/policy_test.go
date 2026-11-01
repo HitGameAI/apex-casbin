@@ -14,9 +14,9 @@ package policy
 import (
 	"testing"
 
-	"github.com/kamalyes/go-casbin/errors"
-	"github.com/kamalyes/go-casbin/model"
-	"github.com/kamalyes/go-logger"
+	"github.com/HitGameAI/apex-casbin/errors"
+	"github.com/HitGameAI/apex-casbin/model"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

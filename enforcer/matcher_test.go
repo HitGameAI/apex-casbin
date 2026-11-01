@@ -14,9 +14,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/kamalyes/go-casbin/model"
-	"github.com/kamalyes/go-casbin/role"
-	"github.com/kamalyes/go-logger"
+	"github.com/HitGameAI/apex-casbin/model"
+	"github.com/HitGameAI/apex-casbin/role"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/stretchr/testify/assert"
 )
 

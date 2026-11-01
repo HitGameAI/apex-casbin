@@ -18,8 +18,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kamalyes/go-casbin/errors"
-	"github.com/kamalyes/go-toolbox/pkg/serializer"
+	"github.com/HitGameAI/apex-casbin/errors"
+	"github.com/HitGameAI/apex-toolbox/pkg/serializer"
 )
 
 // ==================== 适配器接口定义 ====================

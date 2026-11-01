@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-logger"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

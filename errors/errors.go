@@ -12,7 +12,7 @@
 package errors
 
 import (
-	"github.com/kamalyes/go-toolbox/pkg/errorx"
+	"github.com/HitGameAI/apex-toolbox/pkg/errorx"
 )
 
 // ==================== 模型错误类型（2000-2004） ====================

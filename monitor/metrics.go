@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kamalyes/go-logger"
-	"github.com/kamalyes/go-toolbox/pkg/moment"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
+	"github.com/HitGameAI/apex-toolbox/pkg/moment"
 )
 
 type Metrics struct {

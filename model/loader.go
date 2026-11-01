@@ -14,7 +14,7 @@ package model
 import (
 	"os"
 
-	"github.com/kamalyes/go-casbin/errors"
+	"github.com/HitGameAI/apex-casbin/errors"
 )
 
 func LoadModelFromPath(path string) (map[string]*Assertion, error) {

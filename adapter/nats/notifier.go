@@ -1,0 +1,132 @@
+/*
+ * @Author: kamalyes 501893067@qq.com
+ * @Date: 2025-03-28 00:00:00
+ * @LastEditors: kamalyes 501893067@qq.com
+ * @LastEditTime: 2025-03-28 00:00:00
+ * @FilePath: \go-casbin\go-casbin-nats-adapter\notifier.go
+ * @Description: NATS 通知器核心结构体与构造函数
+ *
+ * Copyright (c) 2025 by kamalyes, All Rights Reserved.
+ */
+
+package natsadapter
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/HitGameAI/apex-casbin/errors"
+	"github.com/HitGameAI/apex-casbin/policy"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
+	"github.com/HitGameAI/apex-toolbox/pkg/idgen"
+	"github.com/HitGameAI/apex-toolbox/pkg/retry"
+	"github.com/nats-io/nats.go"
+)
+
+// 编译时接口断言
+var _ policy.PolicyNotifier = (*NATSNotifier)(nil)
+
+// NATSNotifier 基于 NATS 的策略变更通知器
+// 使用 NATS Subject 作为发布/订阅频道，实现分布式策略同步
+// 适用于轻量级、低延迟的分布式部署场景
+//
+// 支持特性：
+//   - 超低延迟：NATS 是高性能消息系统，延迟在微秒级
+//   - 复用连接：使用外部传入的 NATS 连接，避免重复创建
+//   - 消息去重：基于事件 ID 和来源节点过滤重复/自身事件
+//   - 发布重试：发布失败时自动重试
+//   - JetStream 可选：支持持久化消息（需要 NATS Server 启用 JetStream）
+//   - 异步处理：订阅消息投递到缓冲 channel，由 worker 顺序处理，
+//     避免 handler 执行 ReloadPolicy 阻塞 NATS 消息投递
+type NATSNotifier struct {
+	conn   *nats.Conn             // NATS 连接（外部传入，不由本通知器管理生命周期）
+	js     nats.JetStreamContext  // JetStream 上下文（可选，用于持久化）
+	sub    *nats.Subscription     // NATS 订阅对象
+	config *policy.NotifierConfig // 通知器配置
+	logger logger.ILogger         // 日志记录器
+	idgen  idgen.IDGenerator      // ID 生成器
+	retry  *retry.Retry           // 发布重试器
+
+	eventCh      chan *ChangeEvent  // 事件缓冲 channel，单 worker 顺序处理保证事件顺序
+	workerCtx    context.Context    // worker 生命周期控制（用 syncx.EventLoop 监听）
+	workerCancel context.CancelFunc // worker 取消信号
+	wg           sync.WaitGroup     // 等待 worker 优雅退出
+
+	mu      sync.RWMutex              // 保护以下字段
+	running bool                      // 是否正在运行
+	handler policy.ChangeEventHandler // 事件处理函数
+}
+
+// NewNATSNotifier 使用已有的 NATS 连接创建通知器
+// 适用于复用全局 NATS 连接池的场景，避免重复创建连接
+//
+// 参数:
+//   - conn: NATS 连接实例（必须，由调用方管理生命周期）
+//   - js: JetStream 上下文（可选，传 nil 则不使用 JetStream）
+//   - opts: 通知器配置选项（Channel、Source、BufferSize 等）
+//
+// 返回: NATSNotifier 实例或错误
+func NewNATSNotifier(conn *nats.Conn, js nats.JetStreamContext, opts ...policy.NotifierOption) (*NATSNotifier, error) {
+	if conn == nil {
+		return nil, errors.NewPolicyAdapterFailedError("NATS connection is nil")
+	}
+
+	config := policy.DefaultNotifierConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	if config.Source == "unknown" {
+		// 使用 SnowflakeGenerator 生成短节点 ID（比 UUID 更快，纯位运算）
+		flake := idgen.NewSnowflakeGenerator(1, 1)
+		config.Source = fmt.Sprintf("node-%s", flake.GenerateTraceID()[:12])
+	}
+
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	return &NATSNotifier{
+		conn:         conn,
+		js:           js,
+		config:       config,
+		logger:       logger.NewEmptyLogger(),
+		idgen:        idgen.NewSnowflakeGenerator(1, 1),
+		retry:        retry.NewRetry().SetAttemptCount(config.RetryCount).SetInterval(config.RetryInterval),
+		eventCh:      make(chan *ChangeEvent, config.BufferSize),
+		workerCtx:    workerCtx,
+		workerCancel: workerCancel,
+	}, nil
+}
+
+// Close 关闭通知器
+// 注意：不会关闭 NATS 连接本身，因为连接由外部管理
+func (nn *NATSNotifier) Close() error {
+	_ = nn.Unsubscribe()
+	// 不关闭 conn，因为它是外部传入的，由外部管理生命周期
+	return nil
+}
+
+// EnsureStream 确保 JetStream Stream 存在（幂等）
+// 在启用 JetStream 时调用，创建或更新匹配指定 subjects 的 Stream
+// 配置 MaxAge=1h 限制历史消息保留时间，避免新 Durable consumer 启动时回放过量旧事件
+// 应在创建 NATSNotifier 之前调用一次（如服务启动阶段），保证后续 Publish/Subscribe 不会因 Stream 缺失而失败
+func EnsureStream(js nats.JetStreamContext, name string, subjects []string) error {
+	if js == nil {
+		return fmt.Errorf("JetStream context is nil")
+	}
+
+	cfg := &nats.StreamConfig{
+		Name:      name,
+		Subjects:  subjects,
+		Retention: nats.LimitsPolicy,
+		MaxAge:    time.Hour,
+	}
+
+	// 先尝试创建，已存在则更新（幂等）
+	if _, err := js.AddStream(cfg); err != nil {
+		if _, err := js.UpdateStream(cfg); err != nil {
+			return fmt.Errorf("ensure stream %s failed: %w", name, err)
+		}
+	}
+	return nil
+}

@@ -14,7 +14,7 @@ package policy
 import (
 	"strings"
 
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
+	"github.com/HitGameAI/apex-toolbox/pkg/syncx"
 )
 
 // cacheEntry 缓存条目，存储某个策略类型的所有策略规则

@@ -14,7 +14,7 @@ package policy
 import (
 	"strings"
 
-	"github.com/kamalyes/go-casbin/errors"
+	"github.com/HitGameAI/apex-casbin/errors"
 )
 
 // 策略效果常量

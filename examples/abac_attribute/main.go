@@ -12,8 +12,8 @@
 package main
 
 import (
-	"github.com/kamalyes/go-casbin/enforcer"
-	"github.com/kamalyes/go-logger"
+	"github.com/HitGameAI/apex-casbin/enforcer"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 )
 
 // Resource 资源实体（ABAC 属性匹配模式中 r.obj 的类型）

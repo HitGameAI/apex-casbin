@@ -19,15 +19,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kamalyes/go-casbin/errors"
-	"github.com/kamalyes/go-casbin/model"
-	"github.com/kamalyes/go-casbin/policy"
-	"github.com/kamalyes/go-casbin/role"
-	"github.com/kamalyes/go-logger"
-	"github.com/kamalyes/go-toolbox/pkg/breaker"
-	"github.com/kamalyes/go-toolbox/pkg/mathx"
-	"github.com/kamalyes/go-toolbox/pkg/retry"
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
+	"github.com/HitGameAI/apex-casbin/errors"
+	"github.com/HitGameAI/apex-casbin/model"
+	"github.com/HitGameAI/apex-casbin/policy"
+	"github.com/HitGameAI/apex-casbin/role"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
+	"github.com/HitGameAI/apex-toolbox/pkg/breaker"
+	"github.com/HitGameAI/apex-toolbox/pkg/mathx"
+	"github.com/HitGameAI/apex-toolbox/pkg/retry"
+	"github.com/HitGameAI/apex-toolbox/pkg/syncx"
 )
 
 // 执行器状态常量

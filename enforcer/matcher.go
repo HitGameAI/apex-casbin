@@ -17,12 +17,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kamalyes/go-casbin/model"
-	"github.com/kamalyes/go-casbin/policy"
-	"github.com/kamalyes/go-casbin/role"
-	"github.com/kamalyes/go-logger"
-	"github.com/kamalyes/go-toolbox/pkg/safe"
-	"github.com/kamalyes/go-toolbox/pkg/syncx"
+	"github.com/HitGameAI/apex-casbin/model"
+	"github.com/HitGameAI/apex-casbin/policy"
+	"github.com/HitGameAI/apex-casbin/role"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
+	"github.com/HitGameAI/apex-toolbox/pkg/safe"
+	"github.com/HitGameAI/apex-toolbox/pkg/syncx"
 )
 
 // MatchContext 匹配上下文
@@ -644,7 +644,7 @@ func (me *MatcherEngine) resolveValue(token string, vars map[string]interface{})
 			prefix := strings.Join(parts[:i], ".")
 			if root, ok := vars[prefix]; ok {
 				remaining := strings.Join(parts[i:], ".")
-				accessor := safe.Safe(root)
+				accessor := safe.New(root)
 				result := accessor.Field(remaining)
 				if result.IsValid() {
 					return result.Value()
@@ -652,7 +652,7 @@ func (me *MatcherEngine) resolveValue(token string, vars map[string]interface{})
 				// 尝试逐级访问
 				current := root
 				for j := i; j < len(parts); j++ {
-					a := safe.Safe(current)
+					a := safe.New(current)
 					r := a.Field(parts[j])
 					if !r.IsValid() {
 						break

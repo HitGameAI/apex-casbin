@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamalyes/go-casbin/policy"
-	"github.com/kamalyes/go-toolbox/pkg/retry"
+	"github.com/HitGameAI/apex-casbin/policy"
+	"github.com/HitGameAI/apex-toolbox/pkg/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -15,8 +15,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kamalyes/go-casbin/errors"
-	casbinErrors "github.com/kamalyes/go-casbin/errors"
+	"github.com/HitGameAI/apex-casbin/errors"
+	casbinErrors "github.com/HitGameAI/apex-casbin/errors"
 )
 
 var requiredSections = []string{SectionRequestDefinition, SectionPolicyDefinition, SectionPolicyEffect, SectionMatchers}

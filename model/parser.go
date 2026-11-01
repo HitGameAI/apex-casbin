@@ -15,8 +15,8 @@ import (
 	"bufio"
 	"strings"
 
-	"github.com/kamalyes/go-casbin/errors"
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
+	"github.com/HitGameAI/apex-casbin/errors"
+	"github.com/HitGameAI/apex-toolbox/pkg/stringx"
 )
 
 func ParseModelFromText(text string) (map[string]*Assertion, error) {

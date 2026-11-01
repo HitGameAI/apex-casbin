@@ -14,7 +14,7 @@ package monitor
 import (
 	"time"
 
-	"github.com/kamalyes/go-logger"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 )
 
 type Monitor struct {

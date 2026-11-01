@@ -16,9 +16,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kamalyes/go-casbin/errors"
-	"github.com/kamalyes/go-logger"
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
+	"github.com/HitGameAI/apex-casbin/errors"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
+	"github.com/HitGameAI/apex-toolbox/pkg/stringx"
 )
 
 type Config struct {

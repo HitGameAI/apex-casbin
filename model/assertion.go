@@ -14,7 +14,7 @@ package model
 import (
 	"strings"
 
-	"github.com/kamalyes/go-toolbox/pkg/stringx"
+	"github.com/HitGameAI/apex-toolbox/pkg/stringx"
 )
 
 const (
