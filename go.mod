@@ -1,6 +1,6 @@
 module github.com/HitGameAI/apex-casbin
 
-go 1.25.0
+go 1.26.0
 
 require github.com/stretchr/testify v1.12.1
 
@@ -16,15 +16,15 @@ require (
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
-	github.com/nats-io/nkeys v0.4.15 // indirect
+	github.com/nats-io/nkeys v0.4.16 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -39,6 +39,6 @@ require (
 require (
 	github.com/HitGameAI/apex-toolbox v0.19.4
 	github.com/glebarez/sqlite v1.11.0
-	github.com/nats-io/nats.go v1.39.1
+	github.com/nats-io/nats.go v1.55.0
 	gorm.io/gorm v1.31.2
 )
