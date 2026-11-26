@@ -67,5 +67,6 @@ func TestNamedPolicyReadDuringReload(t *testing.T) {
 		require.Equal(t, wantAlice, e.GetFilteredNamedPolicy("p", 0, "alice"))
 		require.Equal(t, wantAll, e.GetPolicy())
 		require.Equal(t, wantAlice, e.GetFilteredPolicy(0, "alice"))
+		require.True(t, e.HasNamedPolicy("p", wantAlice[0]...))
 	}
 }

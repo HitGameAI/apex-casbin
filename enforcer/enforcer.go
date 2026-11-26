@@ -1753,6 +1753,8 @@ func (e *Enforcer) GetFilteredNamedGroupingPolicy(ptype string, fieldIndex int, 
 
 // HasNamedPolicy 判断指定策略类型中是否存在某条策略
 func (e *Enforcer) HasNamedPolicy(ptype string, params ...string) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.policy.HasPolicy(ptype, params)
 }
 
