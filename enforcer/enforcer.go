@@ -1067,16 +1067,25 @@ func (e *Enforcer) UpdateGroupingPolicies(oldRules, newRules [][]string) error {
 
 // GetRolesForUser 获取用户的所有角色
 func (e *Enforcer) GetRolesForUser(name string, domain ...string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.GetRoles(name, domain...)
 }
 
 // GetUsersForRole 获取角色的所有用户
 func (e *Enforcer) GetUsersForRole(name string, domain ...string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.GetUsers(name, domain...)
 }
 
 // HasRoleForUser 判断用户是否拥有指定角色
 func (e *Enforcer) HasRoleForUser(name, roleName string, domain ...string) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.HasLink(name, roleName, domain...)
 }
 
@@ -1184,6 +1193,9 @@ func (e *Enforcer) DeleteRole(roleName string) error {
 
 // GetImplicitRolesForUser 获取用户的隐式角色（包含继承链上的所有角色）
 func (e *Enforcer) GetImplicitRolesForUser(name string, domain ...string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.GetImplicitRoles(name, domain...)
 }
 
@@ -1301,12 +1313,12 @@ func (e *Enforcer) DeletePermission(permission ...string) error {
 // GetUsersForRoleInDomain 获取指定域中拥有某角色的用户列表
 // name: 角色名称，domain: 域标识（如 "tenant1"、"platform:web"）
 func (e *Enforcer) GetUsersForRoleInDomain(name, domain string) []string {
-	return e.roleMgr.GetUsers(name, domain)
+	return e.GetUsersForRole(name, domain)
 }
 
 // GetRolesForUserInDomain 获取指定域中用户的角色列表
 func (e *Enforcer) GetRolesForUserInDomain(name, domain string) []string {
-	return e.roleMgr.GetRoles(name, domain)
+	return e.GetRolesForUser(name, domain)
 }
 
 // GetPermissionsForUserInDomain 获取指定域中用户的权限列表
@@ -1410,7 +1422,7 @@ func (e *Enforcer) DeleteRolesForUserInDomain(user, domain string) error {
 
 // GetAllUsersByDomain 获取指定域中的所有用户
 func (e *Enforcer) GetAllUsersByDomain(domain string) []string {
-	return e.roleMgr.GetUsers("role", domain)
+	return e.GetUsersForRole("role", domain)
 }
 
 // DeleteAllUsersByDomain 删除指定域中的所有用户角色关系
@@ -1451,12 +1463,15 @@ func (e *Enforcer) DeleteDomains(domains ...string) error {
 
 // GetAllDomains 获取所有域列表
 func (e *Enforcer) GetAllDomains() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.GetAllDomains()
 }
 
 // GetAllRolesByDomain 获取指定域中的所有角色
 func (e *Enforcer) GetAllRolesByDomain(domain string) []string {
-	return e.roleMgr.GetRoles("role", domain)
+	return e.GetRolesForUser("role", domain)
 }
 
 // ==================== Transactional API ====================

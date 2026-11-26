@@ -4,7 +4,9 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
+	"github.com/HitGameAI/apex-casbin/policy"
 	"github.com/stretchr/testify/require"
 )
 
@@ -206,4 +208,93 @@ func TestDomainPermissionReadReturnsSnapshot(t *testing.T) {
 	want := clonePolicyRows(policies)
 	policies[0][0] = "caller-owned"
 	require.Equal(t, want, e.GetPermissionsForUserInDomain("alice", "tenant1"))
+}
+
+func TestDomainRoleReadsDuringReload(t *testing.T) {
+	e := newTestEnforcer(t, rbacDomainModelPath, rbacDomainPolicyPath)
+	require.NoError(t, e.AddGroupingPolicy("admin", "reader", "tenant1"))
+	require.NoError(t, e.AddGroupingPolicy("charlie", "role", "tenant1"))
+	require.NoError(t, e.AddGroupingPolicy("role", "reader", "tenant1"))
+
+	type roleRead struct {
+		name string
+		read func() []string
+		want []string
+	}
+	reads := []roleRead{
+		{"roles for user", func() []string { return e.GetRolesForUser("alice", "tenant1") }, []string{"admin"}},
+		{"roles in first tenant", func() []string { return e.GetRolesForUserInDomain("alice", "tenant1") }, []string{"admin"}},
+		{"roles in second tenant", func() []string { return e.GetRolesForUserInDomain("alice", "tenant2") }, []string{"viewer"}},
+		{"users for role", func() []string { return e.GetUsersForRole("admin", "tenant1") }, []string{"alice"}},
+		{"users in domain", func() []string { return e.GetUsersForRoleInDomain("admin", "tenant1") }, []string{"alice"}},
+		{"inherited roles", func() []string { return e.GetImplicitRolesForUser("alice", "tenant1") }, []string{"admin", "reader"}},
+		{"all domains", e.GetAllDomains, []string{"tenant1", "tenant2"}},
+		{"all users in domain", func() []string { return e.GetAllUsersByDomain("tenant1") }, []string{"charlie"}},
+		{"all roles in domain", func() []string { return e.GetAllRolesByDomain("tenant1") }, []string{"reader"}},
+	}
+	for _, read := range reads {
+		result := read.read()
+		require.ElementsMatch(t, read.want, result, read.name)
+		result[0] = "caller-owned"
+		require.ElementsMatch(t, read.want, read.read(), read.name)
+	}
+
+	adapter := &pausedRoleReloadAdapter{
+		Adapter: e.policy.GetAdapter(),
+		entered: make(chan struct{}),
+		resume:  make(chan struct{}),
+	}
+	e.policy.SetAdapter(adapter)
+	reloaded := make(chan error, 1)
+	go func() { reloaded <- e.reloadPolicyForRemoteChange() }()
+	<-adapter.entered
+
+	// The adapter is paused with the reload holding the write lock. This checks
+	// the overlap directly, including methods whose result might otherwise come
+	// from an already warm role cache.
+	type readResult struct {
+		name string
+		got  []string
+		want []string
+	}
+	results := make(chan readResult, len(reads))
+	for _, read := range reads {
+		go func() { results <- readResult{read.name, read.read(), read.want} }()
+	}
+	membership := make(chan bool, 1)
+	go func() { membership <- e.HasRoleForUser("alice", "reader", "tenant1") }()
+
+	remaining := len(reads)
+	membershipRead := false
+	select {
+	case result := <-results:
+		t.Errorf("%s completed with the reload holding the write lock", result.name)
+		remaining--
+	case <-membership:
+		t.Error("role membership completed with the reload holding the write lock")
+		membershipRead = true
+	case <-time.After(40 * time.Millisecond):
+	}
+	close(adapter.resume)
+	require.NoError(t, <-reloaded)
+	for range remaining {
+		result := <-results
+		require.ElementsMatch(t, result.want, result.got, result.name)
+	}
+	if !membershipRead {
+		require.True(t, <-membership)
+	}
+	require.False(t, e.HasRoleForUser("alice", "reader", "tenant2"))
+}
+
+type pausedRoleReloadAdapter struct {
+	policy.Adapter
+	entered chan struct{}
+	resume  chan struct{}
+}
+
+func (a *pausedRoleReloadAdapter) LoadPolicy() ([]string, error) {
+	close(a.entered)
+	<-a.resume
+	return a.Adapter.LoadPolicy()
 }
