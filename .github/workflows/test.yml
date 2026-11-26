@@ -23,14 +23,27 @@ on:
 
 jobs:
   test:
-    uses: HitGameAI/deploy-pipeline/.github/workflows/go-library-test.yml@013c0e1efc2b97819ca13f44fe5432be79f58867
+    uses: HitGameAI/deploy-pipeline/.github/workflows/go-library-test.yml@fe59068c93c25b65ce4b9db6e8e5d801533e7d27
     with:
-      # adapter/gorm 与 adapter/nats 合并进主模块后统一在 ubuntu 上跑：
-      # gorm 适配器走纯 Go 的 sqlite 驱动，nats 适配器用内嵌 nats-server，不需要外部服务
-      # [EN] Both adapters merged into this module run on ubuntu: the gorm adapter uses the pure-Go
-      # sqlite driver and the nats adapter starts an in-process nats-server, so no services are needed
+      # GORM uses SQLite. NATS integration tests use a disposable loopback JetStream.
       platforms: '["ubuntu-latest"]'
+      coverage-upload: ${{ github.event_name != 'pull_request' }}
+      test-flags: ${{ github.event_name == 'pull_request' && '-race -count=1' || '' }}
+      setup-script: |
+        fixture_dir=$(mktemp -d)
+        GOBIN="$fixture_dir" go install github.com/nats-io/nats-server/v2@v2.11.9
+        "$fixture_dir/nats-server" --addr 127.0.0.1 --port 4222 --jetstream --store_dir "$fixture_dir/jetstream" > "$fixture_dir/server.log" 2>&1 &
+        fixture_pid=$!
+        for attempt in $(seq 1 40); do
+          kill -0 "$fixture_pid" || { cat "$fixture_dir/server.log"; exit 1; }
+          if grep -q 'Server is ready' "$fixture_dir/server.log"; then
+            exit 0
+          fi
+          sleep 0.25
+        done
+        cat "$fixture_dir/server.log"
+        exit 1
     secrets:
       # 显式映射而非 secrets: inherit —— inherit 跨账号调用时拿不到值
       # [EN] Mapped explicitly rather than with secrets: inherit, which yields nothing across accounts
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      CODECOV_TOKEN: ${{ github.event_name != 'pull_request' && secrets.CODECOV_TOKEN || '' }}
