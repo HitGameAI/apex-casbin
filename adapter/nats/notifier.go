@@ -19,8 +19,8 @@ import (
 
 	"github.com/HitGameAI/apex-casbin/errors"
 	"github.com/HitGameAI/apex-casbin/policy"
-	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/HitGameAI/apex-toolbox/pkg/idgen"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/HitGameAI/apex-toolbox/pkg/retry"
 	"github.com/nats-io/nats.go"
 )

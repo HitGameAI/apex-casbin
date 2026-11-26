@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/HitGameAI/apex-casbin/policy"
-	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/HitGameAI/apex-toolbox/pkg/breaker"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/HitGameAI/apex-toolbox/pkg/retry"
 )
 
