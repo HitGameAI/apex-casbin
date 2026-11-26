@@ -14,6 +14,7 @@ package enforcer
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,8 +24,8 @@ import (
 	"github.com/HitGameAI/apex-casbin/model"
 	"github.com/HitGameAI/apex-casbin/policy"
 	"github.com/HitGameAI/apex-casbin/role"
-	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/HitGameAI/apex-toolbox/pkg/breaker"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/HitGameAI/apex-toolbox/pkg/mathx"
 	"github.com/HitGameAI/apex-toolbox/pkg/retry"
 	"github.com/HitGameAI/apex-toolbox/pkg/syncx"
@@ -1698,23 +1699,36 @@ func (e *Enforcer) GetAllUsers() []string {
 
 // GetPolicy 获取 p 段的所有策略
 func (e *Enforcer) GetPolicy() [][]string {
-	return e.policy.GetAllPolicies(policy.PTypePolicy)
+	return e.GetNamedPolicy(policy.PTypePolicy)
 }
 
 // GetFilteredPolicy 获取 p 段的过滤策略
 // fieldIndex: 起始字段索引，fieldValues: 过滤值
 func (e *Enforcer) GetFilteredPolicy(fieldIndex int, fieldValues ...string) [][]string {
-	return e.policy.GetFilteredPolicy(policy.PTypePolicy, fieldIndex, fieldValues...)
+	return e.GetFilteredNamedPolicy(policy.PTypePolicy, fieldIndex, fieldValues...)
 }
 
 // GetNamedPolicy 获取指定策略类型的所有策略
 func (e *Enforcer) GetNamedPolicy(ptype string) [][]string {
-	return e.policy.GetAllPolicies(ptype)
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return clonePolicyRows(e.policy.GetAllPolicies(ptype))
 }
 
 // GetFilteredNamedPolicy 获取指定策略类型的过滤策略
 func (e *Enforcer) GetFilteredNamedPolicy(ptype string, fieldIndex int, fieldValues ...string) [][]string {
-	return e.policy.GetFilteredPolicy(ptype, fieldIndex, fieldValues...)
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return clonePolicyRows(e.policy.GetFilteredPolicy(ptype, fieldIndex, fieldValues...))
+}
+
+// clonePolicyRows detaches a returned policy snapshot from the live model.
+func clonePolicyRows(rows [][]string) [][]string {
+	result := slices.Clone(rows)
+	for i, row := range result {
+		result[i] = slices.Clone(row)
+	}
+	return result
 }
 
 // GetGroupingPolicy 获取 g 段的所有角色分组策略
