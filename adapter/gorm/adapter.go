@@ -20,11 +20,11 @@ import (
 
 	"github.com/HitGameAI/apex-casbin/errors"
 	"github.com/HitGameAI/apex-casbin/policy"
+	"github.com/HitGameAI/apex-toolbox/pkg/contextx"
 	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/HitGameAI/apex-toolbox/pkg/sqlbuilder/constants"
 	"github.com/HitGameAI/apex-toolbox/pkg/sqlbuilder/db"
 	"github.com/HitGameAI/apex-toolbox/pkg/sqlbuilder/repository"
-	"github.com/HitGameAI/apex-toolbox/pkg/contextx"
 	"gorm.io/gorm"
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"

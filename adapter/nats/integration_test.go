@@ -14,6 +14,7 @@ package natsadapter
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -196,6 +197,8 @@ func TestHighThroughput(t *testing.T) {
 		t.Skip("Skipping high throughput test in short mode")
 	}
 
+	const messageCount = 1000
+
 	conn := setupNATSConnection(t)
 	defer conn.Close()
 
@@ -209,26 +212,22 @@ func TestHighThroughput(t *testing.T) {
 	subscriber, err := NewNATSNotifier(conn, nil,
 		policy.WithChannel(testSubject+".throughput"),
 		policy.WithSource("subscriber"),
+		// This test requires delivery of the whole burst. A full notifier buffer
+		// intentionally drops events, so size it for every message in the burst.
+		policy.WithBufferSize(messageCount),
 	)
 	require.NoError(t, err)
 	defer subscriber.Close()
 
-	messageCount := 1000
-	var wg sync.WaitGroup
-	wg.Add(messageCount)
-
-	receivedCount := 0
-	var mu sync.Mutex
-
+	var received atomic.Int32
+	done := make(chan struct{})
 	err = subscriber.Subscribe(context.Background(), func(event *ChangeEvent) {
-		mu.Lock()
-		receivedCount++
-		mu.Unlock()
-		wg.Done()
+		if received.Add(1) == messageCount {
+			close(done)
+		}
 	})
 	require.NoError(t, err)
-
-	time.Sleep(100 * time.Millisecond)
+	require.NoError(t, conn.FlushTimeout(testTimeout))
 
 	// 发布大量消息
 	ctx := context.Background()
@@ -240,28 +239,19 @@ func TestHighThroughput(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// 等待所有消息被接收
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
+	require.NoError(t, conn.FlushTimeout(testTimeout))
 
 	select {
 	case <-done:
 		duration := time.Since(startTime)
-		mu.Lock()
-		assert.Equal(t, messageCount, receivedCount, "Should receive all messages")
-		mu.Unlock()
+		require.EqualValues(t, messageCount, received.Load(), "Should receive all messages")
 
 		throughput := float64(messageCount) / duration.Seconds()
 		t.Logf("Throughput: %.2f messages/second", throughput)
 		t.Logf("Total time: %v", duration)
 		t.Logf("Average latency: %v", duration/time.Duration(messageCount))
 	case <-time.After(30 * time.Second):
-		mu.Lock()
-		t.Fatalf("Timeout: only received %d/%d messages", receivedCount, messageCount)
-		mu.Unlock()
+		t.Fatalf("Timeout: only received %d/%d messages", received.Load(), messageCount)
 	}
 }
 

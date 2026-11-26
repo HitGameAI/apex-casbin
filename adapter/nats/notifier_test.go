@@ -12,9 +12,11 @@
 package natsadapter
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -27,8 +29,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testNATSURL = cmp.Or(os.Getenv("CASBIN_TEST_NATS_URL"), "nats://127.0.0.1:4222")
+
 const (
-	testNATSURL     = "nats://192.168.1.10:4222"
 	testSubject     = "casbin.policy.test"
 	testTimeout     = 5 * time.Second
 	testWaitMessage = 2 * time.Second

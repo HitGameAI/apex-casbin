@@ -14,6 +14,7 @@ package enforcer
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,8 +24,8 @@ import (
 	"github.com/HitGameAI/apex-casbin/model"
 	"github.com/HitGameAI/apex-casbin/policy"
 	"github.com/HitGameAI/apex-casbin/role"
-	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/HitGameAI/apex-toolbox/pkg/breaker"
+	"github.com/HitGameAI/apex-toolbox/pkg/logger"
 	"github.com/HitGameAI/apex-toolbox/pkg/mathx"
 	"github.com/HitGameAI/apex-toolbox/pkg/retry"
 	"github.com/HitGameAI/apex-toolbox/pkg/syncx"
@@ -1066,16 +1067,25 @@ func (e *Enforcer) UpdateGroupingPolicies(oldRules, newRules [][]string) error {
 
 // GetRolesForUser 获取用户的所有角色
 func (e *Enforcer) GetRolesForUser(name string, domain ...string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.GetRoles(name, domain...)
 }
 
 // GetUsersForRole 获取角色的所有用户
 func (e *Enforcer) GetUsersForRole(name string, domain ...string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.GetUsers(name, domain...)
 }
 
 // HasRoleForUser 判断用户是否拥有指定角色
 func (e *Enforcer) HasRoleForUser(name, roleName string, domain ...string) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.HasLink(name, roleName, domain...)
 }
 
@@ -1183,11 +1193,17 @@ func (e *Enforcer) DeleteRole(roleName string) error {
 
 // GetImplicitRolesForUser 获取用户的隐式角色（包含继承链上的所有角色）
 func (e *Enforcer) GetImplicitRolesForUser(name string, domain ...string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.GetImplicitRoles(name, domain...)
 }
 
 // GetImplicitPermissionsForUser 获取用户的隐式权限（包含继承链上所有角色的权限）
 func (e *Enforcer) GetImplicitPermissionsForUser(user string, domain ...string) [][]string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	roles := e.roleMgr.GetImplicitRoles(user, domain...)
 	roles = append(roles, user)
 
@@ -1200,7 +1216,7 @@ func (e *Enforcer) GetImplicitPermissionsForUser(user string, domain ...string) 
 			key := strings.Join(p, ",")
 			if !seen[key] {
 				seen[key] = true
-				permissions = append(permissions, p)
+				permissions = append(permissions, slices.Clone(p))
 			}
 		}
 	}
@@ -1210,6 +1226,9 @@ func (e *Enforcer) GetImplicitPermissionsForUser(user string, domain ...string) 
 
 // GetImplicitUsersForPermission 获取拥有指定权限的所有隐式用户
 func (e *Enforcer) GetImplicitUsersForPermission(permission ...string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	policies := e.policy.GetFilteredPolicy(policy.PTypePolicy, 1, permission...)
 
 	var users []string
@@ -1235,12 +1254,12 @@ func (e *Enforcer) GetImplicitUsersForPermission(permission ...string) []string 
 
 // GetPermissionsForUser 获取用户的直接权限
 func (e *Enforcer) GetPermissionsForUser(user string, domain ...string) [][]string {
-	return e.policy.GetFilteredPolicy(policy.PTypePolicy, 0, user)
+	return e.GetFilteredPolicy(0, user)
 }
 
 // HasPermissionForUser 判断用户是否拥有指定权限
 func (e *Enforcer) HasPermissionForUser(user string, permission ...string) bool {
-	return e.policy.HasPolicy(policy.PTypePolicy, append([]string{user}, permission...))
+	return e.HasNamedPolicy(policy.PTypePolicy, append([]string{user}, permission...)...)
 }
 
 // AddPermissionForUser 为用户添加单条权限
@@ -1294,17 +1313,20 @@ func (e *Enforcer) DeletePermission(permission ...string) error {
 // GetUsersForRoleInDomain 获取指定域中拥有某角色的用户列表
 // name: 角色名称，domain: 域标识（如 "tenant1"、"platform:web"）
 func (e *Enforcer) GetUsersForRoleInDomain(name, domain string) []string {
-	return e.roleMgr.GetUsers(name, domain)
+	return e.GetUsersForRole(name, domain)
 }
 
 // GetRolesForUserInDomain 获取指定域中用户的角色列表
 func (e *Enforcer) GetRolesForUserInDomain(name, domain string) []string {
-	return e.roleMgr.GetRoles(name, domain)
+	return e.GetRolesForUser(name, domain)
 }
 
 // GetPermissionsForUserInDomain 获取指定域中用户的权限列表
 // 先获取用户在域中的所有角色，再查找这些角色在域中的策略
 func (e *Enforcer) GetPermissionsForUserInDomain(user, domain string) [][]string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	roles := e.roleMgr.GetRoles(user, domain)
 	allSubjects := append([]string{user}, roles...)
 
@@ -1312,9 +1334,6 @@ func (e *Enforcer) GetPermissionsForUserInDomain(user, domain string) [][]string
 	for _, s := range allSubjects {
 		subjectSet[s] = struct{}{}
 	}
-
-	e.mu.RLock()
-	defer e.mu.RUnlock()
 
 	assertion := e.getPolicyAssertion()
 	if assertion == nil {
@@ -1332,7 +1351,7 @@ func (e *Enforcer) GetPermissionsForUserInDomain(user, domain string) [][]string
 		if _, ok := subjectSet[p[0]]; !ok {
 			continue
 		}
-		result = append(result, p)
+		result = append(result, slices.Clone(p))
 	}
 	return result
 }
@@ -1403,7 +1422,7 @@ func (e *Enforcer) DeleteRolesForUserInDomain(user, domain string) error {
 
 // GetAllUsersByDomain 获取指定域中的所有用户
 func (e *Enforcer) GetAllUsersByDomain(domain string) []string {
-	return e.roleMgr.GetUsers("role", domain)
+	return e.GetUsersForRole("role", domain)
 }
 
 // DeleteAllUsersByDomain 删除指定域中的所有用户角色关系
@@ -1444,12 +1463,15 @@ func (e *Enforcer) DeleteDomains(domains ...string) error {
 
 // GetAllDomains 获取所有域列表
 func (e *Enforcer) GetAllDomains() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	return e.roleMgr.GetAllDomains()
 }
 
 // GetAllRolesByDomain 获取指定域中的所有角色
 func (e *Enforcer) GetAllRolesByDomain(domain string) []string {
-	return e.roleMgr.GetRoles("role", domain)
+	return e.GetRolesForUser("role", domain)
 }
 
 // ==================== Transactional API ====================
@@ -1463,9 +1485,10 @@ func (e *Enforcer) GetAllRolesByDomain(domain string) []string {
 // ExecuteInTransaction 在事务中执行批量操作
 // 适配器支持事务时，所有操作在同一个数据库事务中执行
 //
-// 约束：fn 回调在 e.mu.Lock 持有期间执行，fn 内禁止调用 AddPolicy/RemovePolicy/
-// AddGroupingPolicy 等公开 API（它们内部会 e.mu.Lock 导致自死锁）
-// fn 内应直接调用 e.policy 的内部方法（如 e.policy.AddPolicy/e.policy.RemoveFilteredPolicy）
+// 约束：fn 在持有 Enforcer 写锁时执行。回调内只能通过 GetPolicyManager
+// 操作策略，包括读取。不要调用会获取 Enforcer 锁的公开接口，例如 AddPolicy、
+// GetPolicy、GetGroupingPolicy 或 HasNamedPolicy。RWMutex 不可重入，
+// 在写锁内再次加读锁或写锁都会死锁。跨出回调使用的策略行应在回调内复制。
 // 参见 TransactionalSyncUserRoles/TransactionalDeleteUser 的实现
 func (e *Enforcer) ExecuteInTransaction(ctx context.Context, fn func() error) error {
 	// 快速失败：上下文已取消时不再开启事务，避免 driver: bad connection 等级联错误
@@ -1617,11 +1640,16 @@ func (e *Enforcer) TransactionalDeleteRole(ctx context.Context, roleName string)
 
 // GetAllSubjects 获取所有策略主体（p 段第 0 字段去重）
 func (e *Enforcer) GetAllSubjects() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.policy.GetAllSubjects()
 }
 
 // GetAllNamedSubjects 获取指定策略类型的所有主体（去重）
 func (e *Enforcer) GetAllNamedSubjects(ptype string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	policies := e.policy.GetAllPolicies(ptype)
 	seen := make(map[string]bool)
 	var result []string
@@ -1636,11 +1664,16 @@ func (e *Enforcer) GetAllNamedSubjects(ptype string) []string {
 
 // GetAllObjects 获取所有策略客体（p 段第 1 字段去重）
 func (e *Enforcer) GetAllObjects() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.policy.GetAllObjects()
 }
 
 // GetAllNamedObjects 获取指定策略类型的所有客体（去重）
 func (e *Enforcer) GetAllNamedObjects(ptype string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	policies := e.policy.GetAllPolicies(ptype)
 	seen := make(map[string]bool)
 	var result []string
@@ -1655,11 +1688,16 @@ func (e *Enforcer) GetAllNamedObjects(ptype string) []string {
 
 // GetAllActions 获取所有策略动作（p 段第 2 字段去重）
 func (e *Enforcer) GetAllActions() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.policy.GetAllActions()
 }
 
 // GetAllNamedActions 获取指定策略类型的所有动作（去重）
 func (e *Enforcer) GetAllNamedActions(ptype string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	policies := e.policy.GetAllPolicies(ptype)
 	seen := make(map[string]bool)
 	var result []string
@@ -1674,11 +1712,16 @@ func (e *Enforcer) GetAllNamedActions(ptype string) []string {
 
 // GetAllRoles 获取所有角色（g 段第 1 字段去重）
 func (e *Enforcer) GetAllRoles() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.policy.GetAllRoles()
 }
 
 // GetAllNamedRoles 获取指定策略类型的所有角色（去重）
 func (e *Enforcer) GetAllNamedRoles(ptype string) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	policies := e.policy.GetAllPolicies(ptype)
 	seen := make(map[string]bool)
 	var result []string
@@ -1693,68 +1736,85 @@ func (e *Enforcer) GetAllNamedRoles(ptype string) []string {
 
 // GetAllUsers 获取所有用户列表
 func (e *Enforcer) GetAllUsers() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.policy.GetAllUsers()
 }
 
 // GetPolicy 获取 p 段的所有策略
 func (e *Enforcer) GetPolicy() [][]string {
-	return e.policy.GetAllPolicies(policy.PTypePolicy)
+	return e.GetNamedPolicy(policy.PTypePolicy)
 }
 
 // GetFilteredPolicy 获取 p 段的过滤策略
 // fieldIndex: 起始字段索引，fieldValues: 过滤值
 func (e *Enforcer) GetFilteredPolicy(fieldIndex int, fieldValues ...string) [][]string {
-	return e.policy.GetFilteredPolicy(policy.PTypePolicy, fieldIndex, fieldValues...)
+	return e.GetFilteredNamedPolicy(policy.PTypePolicy, fieldIndex, fieldValues...)
 }
 
 // GetNamedPolicy 获取指定策略类型的所有策略
 func (e *Enforcer) GetNamedPolicy(ptype string) [][]string {
-	return e.policy.GetAllPolicies(ptype)
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return clonePolicyRows(e.policy.GetAllPolicies(ptype))
 }
 
 // GetFilteredNamedPolicy 获取指定策略类型的过滤策略
 func (e *Enforcer) GetFilteredNamedPolicy(ptype string, fieldIndex int, fieldValues ...string) [][]string {
-	return e.policy.GetFilteredPolicy(ptype, fieldIndex, fieldValues...)
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return clonePolicyRows(e.policy.GetFilteredPolicy(ptype, fieldIndex, fieldValues...))
+}
+
+// clonePolicyRows detaches a returned policy snapshot from the live model.
+func clonePolicyRows(rows [][]string) [][]string {
+	result := slices.Clone(rows)
+	for i, row := range result {
+		result[i] = slices.Clone(row)
+	}
+	return result
 }
 
 // GetGroupingPolicy 获取 g 段的所有角色分组策略
 func (e *Enforcer) GetGroupingPolicy() [][]string {
-	return e.policy.GetAllPolicies(policy.PTypeGrouping)
+	return e.GetNamedGroupingPolicy(policy.PTypeGrouping)
 }
 
 // GetFilteredGroupingPolicy 获取 g 段的过滤分组策略
 func (e *Enforcer) GetFilteredGroupingPolicy(fieldIndex int, fieldValues ...string) [][]string {
-	return e.policy.GetFilteredPolicy(policy.PTypeGrouping, fieldIndex, fieldValues...)
+	return e.GetFilteredNamedGroupingPolicy(policy.PTypeGrouping, fieldIndex, fieldValues...)
 }
 
 // GetNamedGroupingPolicy 获取指定策略类型的所有分组策略
 func (e *Enforcer) GetNamedGroupingPolicy(ptype string) [][]string {
-	return e.policy.GetAllPolicies(ptype)
+	return e.GetNamedPolicy(ptype)
 }
 
 // GetFilteredNamedGroupingPolicy 获取指定策略类型的过滤分组策略
 func (e *Enforcer) GetFilteredNamedGroupingPolicy(ptype string, fieldIndex int, fieldValues ...string) [][]string {
-	return e.policy.GetFilteredPolicy(ptype, fieldIndex, fieldValues...)
+	return e.GetFilteredNamedPolicy(ptype, fieldIndex, fieldValues...)
 }
 
 // HasNamedPolicy 判断指定策略类型中是否存在某条策略
 func (e *Enforcer) HasNamedPolicy(ptype string, params ...string) bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.policy.HasPolicy(ptype, params)
 }
 
 // HasPolicy 判断 p 段中是否存在某条策略
 func (e *Enforcer) HasPolicy(params ...string) bool {
-	return e.policy.HasPolicy(policy.PTypePolicy, params)
+	return e.HasNamedPolicy(policy.PTypePolicy, params...)
 }
 
 // HasGroupingPolicy 判断 g 段中是否存在某条分组策略
 func (e *Enforcer) HasGroupingPolicy(params ...string) bool {
-	return e.policy.HasPolicy(policy.PTypeGrouping, params)
+	return e.HasNamedGroupingPolicy(policy.PTypeGrouping, params...)
 }
 
 // HasNamedGroupingPolicy 判断指定策略类型中是否存在某条分组策略
 func (e *Enforcer) HasNamedGroupingPolicy(ptype string, params ...string) bool {
-	return e.policy.HasPolicy(ptype, params)
+	return e.HasNamedPolicy(ptype, params...)
 }
 
 // ==================== Self API (without autoNotifyWatcher) ====================

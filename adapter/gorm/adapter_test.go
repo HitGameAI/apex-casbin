@@ -15,9 +15,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/glebarez/sqlite"
 	"github.com/HitGameAI/apex-casbin/policy"
 	"github.com/HitGameAI/apex-toolbox/pkg/logger"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
